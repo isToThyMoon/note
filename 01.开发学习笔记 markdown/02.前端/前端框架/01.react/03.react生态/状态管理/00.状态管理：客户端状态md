@@ -1,0 +1,281 @@
+
+react使用全局状态管理前有一个无法避免的问题，react的性能是要开发者自己去维护的，diff算法比较前后两个render树状态是否发生改变，它的比较不是状态具体值是否发生改变，而是依赖的值的引用究竟变没变。这是react比较式更新的一个缺点，当父组件更新时，diff算法导致理论上所有子组件都会rerender（render函数调用，生成jsx），构建workInProgress tree后，对比之前的虚拟dom后打上更新标记，通知浏览器执行真正的dom操作。这样组件层级很深且组件非常多时，就会出现性能问题。
+class时代有shouldComponentUpdate，hooks时代有React.Memo，useMemo，useCallback这些api组合来告诉框架是否rerender本组件，缓存值和函数地址。
+
+react的这种比较式更新逻辑导致使用了全局的状态管理情况下当状态变化时，很难做到细粒度的组件更新。
+新出的状态库基本都采用了发布订阅模式或者proxy来解决细粒度响应（并不是完全体的类似vue那么精确的细粒度响应）。
+
+react18开始，为了避免处理函数作为子组件props下钻，官方推荐useReducer和useContext配合。这时使用全局状态管理库的目的有了点变化，实际上是业务逻辑的分离。
+
+使用全局状态管理库的目的不仅仅是为了不同层级组件的状态共享，
+也有了业务、视图分离功能
+和
+性能优化的功能（状态管理方案都会自己维护所有的基础状态与派生状态。当开发者从状态管理库中引入状态时，就能最大限度保持props引用不变）。
+
+# react18concurrent模式带来的问题
+但是，对于开启并发更新的React，更新流程可能中断，不同的Item组件可能是在中断前后不同的宏任务中render，传递给他们的data props可能并不相同。这就导致同一次更新，同一个状态（例子中的list）前后不一致的情况。
+
+这种情况被称为tearing（视图撕裂）。
+
+可以发现，造成tearing的原因是 —— 外部状态（状态管理库维护的状态）与React内部状态的同步时机出问题。
+
+这个问题在当前React中是很难解决的。退而求其次，为了让这些状态库能够正常使用，React专门出了个hook —— useSyncExternalStore。用于将状态管理库触发的更新都以同步的方式执行，这样就不会有同步时机的问题。
+
+既然是以同步的方式执行，那肯定没法并发更新。
+
+实际上，凡是涉及到「自己维护了一个外部状态」的库（比如动画库），都涉及到状态同步的问题，很有可能无法兼容并发更新。
+所以，你会更倾向下面哪种选择呢：
+不care并发更新，以前React怎么用，现在就怎么用
+根据项目情况，平衡并发更新与性能优化的诉求
+
+
+# 全局状态管理
+react小场景的状态管理：state props 
+复杂一点，层级深一点：context，但context并不是第一选择，它全量更新所有组件会导致大量无用渲染。
+
+组件组合（component composition）：
+如果你只是想避免层层传递一些属性，组件组合（component composition）有时候是一个比 context 更好的解决方案。
+
+如果在最后只有最底层组件avatar真的需要 user 和 avatarSize，那么层层传递这两个 props 就显得非常冗余。而且一旦 Avatar 组件需要更多从来自顶层组件的 props，你还得在中间层级一个一个加上去，这将会变得非常麻烦。一种无需 context 的解决方案是将 Avatar 组件自身传递下去，因而中间组件无需知道 user 或者 avatarSize 等 props，
+
+解决层层传递props的一种解决方式，可以将最深层的组件提升到操作数据的高层组件。
+
+而且你的组件并不限制于接收单个子组件。你可能会传递多个子组件，甚至会为这些子组件（children）封装多个单独的“接口（slots）”。
+
+```ts
+function Page(props) {
+  const user = props.user;
+  
+  const content = <Feed user={user} />;
+  
+  const topBar = (
+    <NavigationBar>
+      <Link href={user.permalink}>
+        <Avatar user={user} size={props.avatarSize} />
+      </Link>
+    </NavigationBar>
+  );
+  
+  return (
+    <PageLayout
+      topBar={topBar}
+      content={content}
+    />
+  );
+}
+```
+
+再复杂的场景，就需要全局状态管理库了。
+react状态库至今没有一个得到社区广泛采纳的方案，实现库非常多，可以说繁荣，也可以说没有最佳实践，都很难用。
+
+基础场景：react hooks开始 useContext + useReducer （问题是更新组件的粒度太大）
+*局限性：useReducer保存的state还是和组件绑定的，是无法存取 global store 的，必須要搭配 useContext 才能做到轻量化的redux。
+不能像 Redux 能用 thunk 或 saga來做 data fetching 、 處理side effect。*
+需要注意到大部分场景下并不需要考虑context的性能问题，这也是官方为什么说你可能不需要状态库的原因。react发展到18并没有把组件的rerender当成一件必须要去避免的恐怖的事情，甚至不保证你的组件会rerender几次。
+
+（redux v6版本就是直接使用了context来存储数据，但是发现出现所谓性能问题，更新组件的粒度太大，store 中值的变化不会触发根组件 Provider 的 re-render，随后v7版本又重新回到Subscriptions 的实现方式。订阅最近 connect 的祖先组件或者 store 中，当被订阅者 notifyNestedSubs 时，将触发该组件的checkForUpdates）
+
+但是，
+当状态为对象，一个操作需要操作大量state；
+跨多组件的state或者需要修改非常深层子组件状态；
+应用程序过大需要UI和业务解耦；
+
+复杂场景：
+class时代：
+redux：
+ 不可变（immutable）数据，action reducer的经典结构让状态（业务）和视图解耦，集中式的处理复杂的state管理，好处是组件中清晰反应操作意图，具体每一个业务操作对应一个状态action修改在reducer中处理。（MVVM）
+ 缺点是代码量变多，大量的样板代码，书写时的心智负担比较大。而且react官方推荐各子组件的状态由各自维护，这是为了防止各种隐式状态变动泛滥，但是react中状态提升不可避免，redux集中式管理状态可以解决隐式状态变动问题，但是类似组件显状态这些高度绑定子组件的state就没必要集中提升到redux，总之还是按需提升，redux更适合复杂多变的状态且跨越多个组件。
+ 
+redux各系列衍生品dva umi（redux各种系列的衍生 saga系列是绝对的坑 已死 不考虑）
+mobx（可变（mutable）数据）
+
+hook时代：
+redux toolkit  （不可变（immutable）数据）（redux的hook版升级，简化操作。一个reducer函数对应一次状态处理）
+recoil （facebook官方发布 原子化概念）
+zustand  （观察者模式 不可变（immutable）数据 继承redux的概念）
+jotai （借鉴了 Recoil 的原子化概念）
+valtio （可变（mutable）数据 通过Proxy & Reflect API 代理状态 类似mobx）
+
+特别复杂场景的状态/数据处理（时序、缓存、依赖、重试等）直接考虑RxJS
+
+class时代可以说redux一统江湖，不管如何批评redux哲学繁杂难以理解，但它还是最后迫不得已下最优的选择，用户多，解决方案多，生态繁荣。
+
+进入hooks时代爆发出了一波新的状态库，究其原因是react本身的开发哲学发生了变化。
+
+## 将主流状态库分类：
+按状态存放位置分类：
+状态存放在React tree中，依赖于React State和Context API，因此只能在React中使用：Recoil，jotai，（ valtio）
+与UI层无关，状态存放在外部的store中：Redux，Mobx
+
+按设计理念分类：
+Flux: 中心化store，通过action更新数据 比较式更新rerender：Redux, Zustand
+Proxy: 分布式数仓 拦截数据访问精准rerender：Mobx, Valtio
+Atomic: 状态以原子式存在于React tree，和React的useState类似：以Recoil, Jotai
+
+
+## 为什么要管理全局状态
+全局状态库太多，为什么要有这么多的状态库，他们的区别是什么，基于什么样的思想进行了这么多不同的封装？
+先需要了解为什么前端框架中要有状态概念。
+
+早先jquery时代是没有状态的，一切UI变更通过js代码直接操作dom。各个数据逻辑交叉时就会形成面条代码，你中有我我中有你，而且无法理清一条逻辑的完整执行，代码迭代和调试都无从下手。
+
+因为jq是纯正的命令式编程，它符合我们对直接掌控“过程”的直觉。
+
+react框架出现最根本的原因就是要颠覆这种命令式编程，如果一切UI的变动都可以用数据的变动来描述，那么我们直接去修改数据，至于数据修改后UI如何响应这些变动，开发者不去关注，中间的黑盒托管给框架去完成。
+
+这就是声明式编程，把对“过程”操作转变成对“状态”描述，以数据驱动UI。
+
+这里的状态就是描述UI的动态数据，它可以是实际dom中要显示的数字、文本、也可以是modal显隐变量、描述dom的大小位置等等。总之一切描述UI的可变数据，都可以是“状态”。
+
+## class时代的状态管理
+react诞生于2013年5月，实际上也有近10年的时间，但在2015年3月0.13版本发布class组件写法前前端还都是jq的天下，而react真正开始展示统治力开始大范围讨论并使用要到2018年（2017年9月26日react16的发布），引入fiber架构（可中断的异步更新代替同步的更新 16之前react一次渲染开始不可中断 dom过多时会发生卡顿），createContext、createRef、forwardRef、生命周期更新、memo。
+
+class时代，组件的状态就是this.state。为了避免数据混乱，引入组件和单向数据流的概念，而数据在状态间传递就是数据通信。
+父传子通过props，向更深层级传数据通过层层props（并不赞同，超过两层就感觉啰嗦且难以维护代码）。于是有了context，但context其实就是状态提升。
+
+父组件修改子组件状态需要换个思路，需要状态提升（将深层组件状态提升到最高级组件声明），然后层层props传递。
+父组件调用子组件方法可以使用forwardRef。
+
+子传父通过调用父组件下传的函数作为入参传递。
+
+而对于跨层级的组件通信，props传递失灵，context状态提升没那么好用（主要是性能问题，组件更新粒度太大），为了解决核心的跨级通信问题，各种状态库产生。
+
+基于context这种状态提升的逻辑，其实就是将状态集中式中心化管理，以此为代表出现了redux这样的解决方案，解决跨组件全局状态共享问题。
+
+class时代的状态库主要就是redux和mobx。redux更符合react理念，mobx用起来简单。（基本上redux一统江湖）
+redux和mobx区别：
+redux采用中心化唯一数仓，不可变数据，观察者模式，在各组件中订阅listener，触发action修改state更新时，将listener都调用一遍，从而触发组件更新。redux的更新逻辑是严格的immutable，引入immer框架实现只要修改数据即修改引用地址，随即处罚更新。
+mobx采用非唯一数仓，可变数据，mobx采用mutable思想，一切数据都是可修改的，所以修改对象不会引起引用地址变化触发组件rerender，而是通过依赖收集，使用Object.defineProperty来拦截对数据的访问，一旦值发生变化，将会调用react的render方法来实现重新渲染视图。这样能做到组件的rerender精确依赖具体的某个状态值的变动。
+
+但是react官方的态度是并不在意组件多次rerender这件事和它的性能损耗，在react18的strict模式下甚至在组件挂载时故意执行两次渲染以让你发现问题（纯函数的幂等性，唯一输入对应唯一输出）。所以mobx做的精准细粒度更新组件本来就不是react官方设计哲学所追求的。
+
+从vue转到react的习惯了vue的响应式，对mobx的接受度比较高。
+
+redux：
+```js
+createStore = (reducer, state) => ({ 
+    dispatch: action => (state = reducer(state, action)) 
+});
+```
+
+## hook时代的状态管理
+进入react hooks时代产生更多分歧，状态管理出现了jotai（受recoil启发 原子化） zustand（redux） valtio（mobx）...只列出这3个库对应三种解决状态管理的方案，有趣的是这3个库是一个开发者写的，同时布局3个方向。
+hooks时代，业务逻辑和UI逻辑分离也有了很多讨论，因为useEffect的滥用带来比生命周期中写业务更大的破坏。
+
+业务和UI的分离其实也牵扯到状态管理的选择，毕竟业务逻辑就是对数据的操作。
+
+如redux和jotai的区别，jotai的全局状态管理数据绑定在react fiber树，无法脱离react存在。而redux从一开始就声明自己是一个数据层框架，和react作为视图层框架一样，两层本不该越界，你将redux放在vanilla JS项目里也可以做到无缝使用。
+
+这当然是理想状态，快速开发下的大部分的前端场景，业务逻辑和UI状态绑定，用hooks去封装业务逻辑似乎也无可厚非。重点是不要滥用。所以即使推崇redux的情况下，jotai等框架等出现并不是没有原因。
+
+recompose这个库作者加入FB后可能参与了react hooks的推出，它解决了recompose要解决的所有问题，提供一种更纯粹的实践UI=f(state)的方式。
+
+为什么升级hook？宽泛来说就是深度践行函数式编程。
+而且class组件也存在诸多问题。
+this.state的每次更新局部状态，可能都要解构赋值，操作复杂，state的值也比较混沌。
+高阶组件等模式有问题，props的数据来源不透明，props也比较混沌。
+this的概念比较难理解，非常自由。
+
+hooks：
+将混杂的state切分为一个个元数据。每个数据控制单个更新。
+提供自定义hooks逻辑共享，替代高阶组件。
+函数式编程去掉对this对关注。
+
+hooks的三个特点：primitive、decentralization、algebraic effects
+元数据化（原子化），让数据结构更加清晰，作为一种工程趋势，tailwind也是将css元数据化
+去中心化，class时代有着强烈的中心化状态趋势，将状态从顶层向下分发，而hook则是去中心化，提供高强度的“组件自治”能力，（如redux的provider不再必须，状态的分发由组件自行请求处理）。
+代数效应，hooks作为一根管道直通react核心能力，将内部机器暴露给开发者。
+
+由此hooks的状态管理思想将完全不同于class时代，出现了很多新的状态库。
+redux先是提供了useSelector、useDispatch、useStore这些hook，后续又升级了redux toolkit适配hooks的开发哲学。
+redux toolkit应该来说重量级仅次于RxJS，但实际使用并没有感觉很重。
+
+mobx不是唯一数据源的库，不太合react的理念，如果非要纠结组件精确更新，直接写vue3好了。
+
+facebook内部做出了recoil提出原子化思想，但写法别扭。recoil需要手动写key的 包括react query 不建议用。函数式编程轻快至上。
+
+Daishi写了三个状态库，基于三种思想布局。分别是zustand、jotai、valtio。其实是德语 日语 芬兰语中“状态”的意思。
+
+```js
+// zustand - 继承Redux 理念，旧时代精神，中心化仓库逻辑。基于观察者模式 不可变（immutable）数据、
+// 采用全局的状态管理方案 API 清晰简单，不需要额外处理 Context 的重复渲染的问题，不需要 Provider ，相对的通过 forceUpdate 实现组件的更新。脱离于 React 自身的状态，支持非 React 环境使用。
+const useStore = create((set) => ({
+  bears: 0,
+  removeBears: () => set({ bears: 0 }),
+}));
+const bears = useStore((state) => state.bears);
+
+
+// jotai - 去中心化 原子化（primitive）理念，用法和recoil一样略啰嗦，但符合 Hooks 精神
+// jotai同样的全局状态管理方案，借鉴了 `Recoil` 的原子化概念 同样 API 也十分简单， `atom` 和 `useAtom`。通过 `atom` 创建原子化的数据源，调用`useAtom` 传入 `atom` 返回对应的状态值和修改方法。
+const countAtom = atom(0);
+const [count, setCount] = useAtom(countAtom);
+
+
+// valtio -  继承mobx思想 借助 Proxy & Reflect API 代理状态 可变（mutable）数据，"不太 React"，但用起来简单
+const state = proxy({ count: 0, text: 'hello' });
+const snap = useSnapshot(state);
+```
+
+[readux toolkit](https://github.com/reduxjs/redux-toolkit) 8.7k star
+[zustand](https://github.com/pmndrs/zustand)  22.9k star
+[jotai](https://github.com/pmndrs/jotai) 10.5k star
+[valtio](https://github.com/pmndrs/valtio) 5k star 
+
+recoil由于有了jotai这个上位替代，先不讨论，从star上能看出点流行趋势。
+
+redux toolkit仍然是基于 发布订阅/观察者模式、不可变数据、中心化数据仓库思想，解决跨组件全局状态共享问题，关注度远小于它的地位，redux批评的人很多，觉得越写越复杂，越写越坑，社区过分夸大了它的理解难度导致转入的人偏少（个人觉得它的所谓的哲学没什么复杂到难以理解，比起各种业务逻辑，写法也并不复杂，）。其实升级的redux toolkit减少了模版代码，内置了redux-thunk对async支持，内置了immerJs（mobx作者作品）支持不可变数据。稍微配合一下redux logger非常容易工程化。RTK的issue和文档是最多最全的，最佳实践也比较完善，遇到问题你可以更大概率搜索到同行的解决方案。
+
+而继承了redux观察者模式、中心化思想和不可变数据的zustand关注度是最高的，使用上来说也是目前hook下最多的状态库，从这可以看出redux思想并没有难用到被社区抛弃。
+
+jotai继承recoil的去中心化 原子化思想，可以说和redux toolkit与zustand完全相反，它代表了一种更合react hook思想的状态管理思路，流行趋势迅猛，用法略啰嗦值得学习关注。
+
+valtio proxy模式 继承了mobx的可变数据特性，不太“react”，热度最低。
+
+valtio和mobx一样采用proxy代理方式监听数据修改，可变数据和react思想不太合，但使用简单。
+
+数据消费方式的不同也决定了他们 如何追踪 state 的变化，不可变（immutable）数据基于 发布订阅/观察者模式，而可变（mutable）数据基于 Proxy 代理 的方式。独到之处在于proxy可以细粒度精准知道哪个变量更新作一些rerender优化，react本身组件如果不做一些rerender控制，父组件rerender子组件会全部rerender，构建fiber树然后统一diff算法部分更新dom。
+
+React 状态管理思路的变迁：
+整体来说就是
+中心化store ---> 去中心化
+数据集合 ---> 元数据（数据原子化）
+
+
+
+其实任何一种都能满足大部分业务，不要太选择困难，hooks时代可以考虑除了redux toolkit学习下jotai，感受下原子化的全局状态管理，实在不行就直接redux toolkit，redux跟随react16版本发布开始火热，至今已经快5年，可见的时间范围5年内redux toolkit还将继续保持热门，至于超过5年，前端迭代太快，不要考虑那么远。
+
+## 对于redux-toolkit:
+
+redux对自己的官方解释： A predictable state container for JS Apps。为JS Apps准备的可预测状态容器。
+
+首先不是react专属而是所有的JS项目，而状态容器说白了就是一个集中管理的对象{}。
+
+其实我们一定要用这些状态库吗？如果抛开redux mobx zustand等等这些花哨状态库设计哲学，让一个初学者去做js的全局状态管理会怎么做？
+
+直接window.state={}，然后需要修改时直接修改全局变量state的key value就好了，或者我们常常在localStorage中存储一些用户信息，这也是一种全局状态。
+
+可我们应该立马意识到他们的简陋，首先在react组件中，如果简简单单再window上挂载一个全局变量管理全局状态，在修改state时无法做到自动的rerender或者执行一些逻辑操作，这肯定不符合前端框架数据驱动UI的哲学，解决它，我们采用发布订阅模式即可，发布订阅在node中的实现是EventEmitter，或者vue中有EventBus，我们可以使用Object.defineProperty或者proxy去监听全局state变量的属性修改，然后发布stateChange事件，在react组件中事先订阅这个事件，实践触发时调用ReactDOM.render()就可以实现自动的rerender。
+
+实际上这一步在redux中被封装到react-redux的Provider组件中。
+
+为了实现可预测，redux有三大原则
+
+单一store
+
+state是不可变数据（修改state只能通过dispatch）（实现一些时间旅行功能）
+
+处理dispatch逻辑的reducer是纯函数
+
+js分为基础类型和引用类型，对于对象这样的引用类型，修改了它，引用地址不变但是数据被替换，无法回退，只有state是不可变数据，每次修改返回一个新state，让redux保存之前的state，才能做到数据的时间旅行，如果没有immerJS，其实我们每次修改都要return { …state, ……}
+
+reducer是纯函数是确保每次dispatch一个action获得的state是确定的。
+
+绝大部分场景其实无需redux，当你发现很多地方需要用到全局状态，并且在多级的组件树中会修改全局状态以达到全局的响应，那么你需要它。
+
+redux批评的人也很多，觉得越写越复杂，越写越坑，Redux 也提供了基于 Hooks 的 API 使用，推出了 redux-toolkit，完美支持react和ts。升级的redux toolkit减少了模版代码，createAction()生成action creator，createSlice()让用户集中声明reducer，同时reducer的函数名和name属性自动合并成action type，由于createSlice我们可以将以前分离在三个文件的reducer action constants集中到一起。
+
+内置了redux-thunk对async支持，可能不理解为什么要让redux来处理异步操作，首先异步操作在哪处理都可以，没必要用redux，你可以在事件回调中先dispatch(startFetch())，成功返回后在dispatch(fetchSuccess())，失败时dispatch(fetchFailed())。但是这样组件中会参杂很多和UI无关的逻辑代码，很多dispatch非常混乱，而且也不好复用这些异步操作。
+那么你会想到不如将异步操作抽取成一个函数放在单独的文件中，既然是单独的文件那么直接让redux接管，将逻辑解耦到redux中，在redux-thunk处理异步逻辑可以方便地获取state和触发其他action，当然这些都是你的异步操作涉及修改state，如果完全没有涉及到修改state，你完全可以像之前那样抽取封装到单独的api文件中。
+
+内置了immerJs（mobx作者作品）支持不可变数据。稍微配合一下redux logger非常容易工程化。

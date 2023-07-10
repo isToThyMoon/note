@@ -1,0 +1,180 @@
+# Nextjs
+
+# Next
+
+说到到`React`未来的发展，必须从`Next.js`聊起。毕竟，`React`团队成员不是加入`Next`团队，就是在加入的路上。
+
+`web`开发中涉及到前后端交互的部分主要包括：
+
+1. 根据后端数据渲染前端页面
+2. 根据前端用户输入保存数据到后端
+
+`Next.js`的发展主要围绕以上两点展开。
+
+### 根据后端数据渲染前端页面
+
+前期，`Next.js`的主打特性是`SSR`、`SSG`。也就是把**根据后端数据渲染前端页面**的过程从前端挪到后端。
+
+这个时期的`Next.js`路由被称为`Pages Router`。
+
+时间来到`Next.js v13`，以`RSC`（React Server Component）为核心的`App Router`取代`Pages Router`成为默认配置。
+
+很多朋友不熟悉`RSC`，认为他是实验特性。实际上，`RSC`借由`Next.js`已经落地了。
+
+一句话理解`RSC` —— 客户端组件（在浏览器渲染的`React`组件）可以根据依赖分为两部分：
+
+- 依赖数据源（比如数据库、文件系统）的组件，可以作为`RSC`（服务端组件）
+- 依赖状态（比如`state`、`props`、`context`）的组件，可以作为客户端组件
+- 
+
+从**根据后端数据渲染前端页面**角度看：
+
+- `SSR`、`SSG`是页面级别的（服务端渲染呈现的是整个页面）
+- `RSC`是组件级别的（服务端组件请求数据源）
+
+### 根据前端用户输入保存数据到后端
+
+聊完了**根据后端数据渲染前端页面**，那么，围绕**根据前端用户输入保存数据到后端**，`Next.js`能做哪些优化？
+
+这就要提到`Next.js`的实验特性 —— `Server Action`。
+
+## Server Action
+
+**根据前端用户输入保存数据到后端**的常见场景是**表单提交**，通常我们会在`form`的`obSubmit`事件中做后续处理：
+
+```
+
+js复制代码
+function Form() {
+  function submit() {
+    // ...处理formData的逻辑    // ...发送请求的逻辑  }
+  return (
+    <form onSubmit={submit}>      <input type="text"/>      <input type="text"/>    </form>  )
+}
+
+```
+
+以上代码有什么可改进的地方呢？
+
+从用户体验的角度看，如果前端禁用了`JS`，那么`React`不能运行，上述交互失效。如果在禁用`JS`的情况下也能提交表单就好了。
+
+从开发体验的角度看，`submit`方法会发起请求，后端再根据请求携带的`formData`操作数据库，比较繁琐。如果在`submit`方法内能直接操作数据库就好了。
+
+`Server Action`特性就是为了实现以上2个目标。
+
+首先来看第一个目标。
+
+### 目标1
+
+`HTML`原生的`form`元素有个`action`属性，可以接收一个`url`。当提交表单（比如点击`type`为`submit`的按钮）后`formData`会提交给该`url`。
+
+```
+<form action="/action_page.php" method="get">
+  <label for="fname">First name:</label>
+  <input type="text" id="fname" name="fname"><br><br>
+  <label for="lname">Last name:</label>
+  <input type="text" id="lname" name="lname"><br><br>
+  <input type="submit" value="Submit">
+</form>
+```
+
+由于**提交表单**的行为是`HTML`原生支持的，所以在禁用`JS`的情况下也能执行。
+
+这就是禁用`JS`也能提交表单的理论基础。
+
+### 目标2
+
+`React`扩展了`form`的`action`属性，让他除了支持`url`，还能支持回调函数，比如：
+
+```jsx
+function App() {
+	function submit(data) {
+	  // ...  
+	}
+return (
+	<form action={submit}>     
+	 <! -- 省略 -->
+	</form>  
+);
+```
+
+如果这个回调函数内是前端执行的逻辑，则被称为`client action`，比如下面这样：
+
+```jsx
+
+  async function submit(data) {
+	  await const res = saveData(data);
+  // ...  }
+```
+
+如果这个函数内是后端执行的逻辑，则被称为`server action`，比如下面这样：
+
+```jsx
+
+"use server"
+async function submit(data) {
+  const userID = cookies().get("userID")?.value;
+  await db.users.update(userID, data);
+// ...  }
+
+```
+
+> "use server"标记代表这是个server action。
+> 
+
+如果是`server action`，那么发起的请求类型是`multipart/form-data`（即表单提交）：
+
+响应类型则是`RSC协议`
+
+也就是说，有了`server action`，开发者可以直接在`form`的`action`属性（或者`button`的`formAction`属性等其他几种属性）内书写后端逻辑，并且在浏览器禁用`JS`的情况下这些逻辑也能执行。
+
+## 2个新hook
+
+为了更好的服务`server action`，`React`团队新出了2个`hook`用于提高`form`场景下的用户体验：
+
+- `useOptimistic`
+- `useFormStatus`
+
+当前，这2个`hook`的介绍只能在[Next.js文档](https://link.juejin.cn/?target=https%3A%2F%2Fnextjs.org%2Fdocs%2Fapp%2Fbuilding-your-application%2Fdata-fetching%2Fserver-actions%23experimental-useoptimistic)（而不是`React`文档）中看到。
+
+`useOptimistic`主要用来优化**提交数据**的用户体验。
+
+比如，在**点赞**的场景，通常逻辑是：
+
+1. 点击点赞按钮
+2. 发起点赞请求
+3. 点赞成功，前端显示点赞效果
+
+但为了用户体验的流畅，前端通常会把逻辑做成：
+
+1. 点击点赞按钮
+2. 前端显示点赞效果（同时发起点赞请求）
+3. 根据请求结果，如果点赞成功则不做处理，如果点赞失败则重置按钮
+
+`useOptimistic`的本质就是在状态层面实现上述效果。
+
+`useFormStatus`则用于在表单提交过程中显示`pending`状态：
+
+```jsx
+function ButtonDisabledWhilePending({action, children}) {
+  const {pending} = useFormStatus();
+  return (
+    <button disabled={pending} formAction={action}>      
+			{children}
+    </button>  );
+}
+```
+
+有同学可能会疑惑：`useFormStatus`没有传参，他怎么知道对应哪个`form`？
+
+实际上，为了实现`useFormStatus`，`React`在源码内为所有`HostComponent`（即原生`HTML`元素对应组件，比如`<div/>`）定制了一个`context`。
+
+当某个`form`触发表单提交时，`context`的值会被更新为这个`form`的数据。`useFormStatus`本身仅仅是`useContext(上述context)`。
+
+可以发现，不管是`useFormStatus`、`useOptimistic`还是最近1～2年新出的`hook`（比如`useId`、`useMutableSource`），我们开发者都很少会用到。
+
+因为这些`hook`都是为上层框架（主要是`Next.js`）提供的。
+
+`React`早已完成他作为前端框架的使命。在他生命的后半程，他将作为上层框架的**操作系统**而存在。
+
+`server action`是`Next.js`的未来，`Next.js`是`React`的未来。所以，`React`的未来会围绕`form`元素持续布局。
