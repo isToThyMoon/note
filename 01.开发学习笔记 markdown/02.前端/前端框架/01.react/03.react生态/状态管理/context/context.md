@@ -1,10 +1,12 @@
 
 # react官方提供的全局数据流通方式
 
-redux提供了props drilling的功能，以将所有state提高到最高层级为代价（是否有必要），相当于在所有组件中打通数据高速公路，简化组件间的通信。
+redux提供了props drilling的功能，以将所有state提高到最高层级为代价（是否有必要需要按项目复杂度自行判断），相当于在所有组件中打通数据高速公路，简化组件间的通信。
 
-对于该功能，react官方后来提供的替代方案就是：Context，可以在任意层级上构建数据公路。
+react官方后来提供方案就是：Context，可以在任意层级上构建数据公路。
 
+ react-redux 通过 Provider 将 store 中的全局状态在顶层组件向下传递，大家都不陌生，它就是基于 React 所提供的 context 特性实现。
+ 
 
 ## 使用
 context提供了一个无需为每层组件手动添加props，就能在组件树间进行数据传递的方法。
@@ -23,7 +25,8 @@ Context 主要应用场景在于很多不同层级的组件需要访问同样一
 
 ## api
 ### React.createContext
-const MyContext = React.createContext(defaultValue);
+
+`const MyContext = React.createContext(defaultValue);`
 
 创建一个 Context 对象。当 React 渲染一个订阅了这个 Context 对象的组件，这个组件会从组件树中离自身最近的那个匹配的 Provider 中读取到当前的 context 值。
 
@@ -40,6 +43,9 @@ Provider 接收一个 value 属性，传递给消费组件。一个 Provider 可
 
 通过新旧值检测来确定变化，使用了与 Object.is 相同的算法。
 
+
+
+### 订阅消费：
 
 ### Class.contextType
 订阅单个context
@@ -146,6 +152,30 @@ function Content() {
 }
 ```
 如果两个或者更多的 context 值经常被一起使用，那你可能要考虑一下另外创建你自己的渲染组件，以提供这些值。
+
+### useContext 函数组件消费context
+```
+const Context = React.createContext(null);
+
+const Child = () => {
+  const value = React.useContext(Context);
+  return (
+    <div>theme: {value.theme}</div>
+  )
+}
+
+const App = () => {
+  const [count, setCount] = React.useState(0);
+  return (
+    <Context.Provider value={{ theme: 'light' }}>
+      <div onClick={() => setCount(count + 1)}>触发更新</div>
+      <Child />
+    </Context.Provider>
+  )
+}
+
+ReactDOM.render(<App />, document.getElementById('root'));
+```
 
 
 -------
