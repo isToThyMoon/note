@@ -22,7 +22,7 @@
 
 PPI（pic per inch）：每英寸的物理像素数。以尺寸为 5.8 英寸（屏幕对角线长度）、分辨率为 1125 × 2436 的 iPhone X 为例， ppi = Math.sqrt(1125*1125 + 2436*2436) / 5.8，值为 463 ppi。
 
-# CSS 像素：
+# CSS 像素：css pixels
 浏览器使用的单位，这也是开发者直接控制的尺寸度量，用来精确度量网页上的内容，如：div { width: 100px; }。在一般情况下(页面缩放比为 100%)，1 个 CSS 像素等于 1 个设备独立像素。
 devicePixelRatio：设备物理像素和设备独立像素的比例。window.devicePixelRatio = 物理像素 / 设备独立像素。
 其实devicePixelRatio与系统缩放导致的设备独立像素和浏览器内部的浏览器缩放都有关系。可以简单理解为缩放比率。
@@ -38,3 +38,48 @@ Document.documentElement 是一个会返回文档对象（ document ）的根元
 在设置html的width和height都为100%情况下：
 document.documentElement.clientWidth; document.documentElement.clientHeight 不包含滚动条的视窗宽高。也不包含边框（如果有 虽然一般没人会给html元素加border）。
 document.documentElement.offsetWidth; document.documentElement.offsetHight 获取html元素尺寸（包含滚动条）的宽高。
+
+
+
+# 移动端的尺寸
+
+如react native中设置宽高无需携带单位，默认单位是dp。
+
+先了解几个移动端的设备屏幕概念：
+1.screen density(屏幕密度)：屏幕物理区域中的像素量(the quantity of pixels)；通常称为 dpi（每英寸点数）dpi (dots per inch).
+
+2.Resolution(分辨率)：屏幕上物理像素(physical pixels)的总数。
+
+3.Density-independent pixel(密度无关像素) (dp)：
+
+官方网站定义：
+A dp is equal to one physical pixel on a screen with a density of 160.To calculate dp:
+dp = (width in pixels * 160) /  screen density
+
+在定义UI layout时使用的一种虚拟像素单元(virtual pixel unit)，它可以自由地表示布局维度(layout dimensions)或位置(position)而不用去关心屏幕密度(ensure proper display of your UI on screens with different densities).
+dp等于160 dpi屏幕上的一个物理像素(physical pixel)–“medium” density screen. 系统会在运行时根据具体的屏幕密度对dp的大小进行缩放处理，该过程用户不可见。
+
+很明显， dp 与 物理px 有一个关于 (160/screen density) 的正相关的关系：
+
+1dp = 1物理px （screen density = 160dpi）
+1dp = 2物理px （screen density = 320dpi）
+1dp = 3物理px （screen density = 480dpi）
+
+同理在 H5 页面，以下等式是成立的。
+1 (css)px = 1设备独立像素 = 设备实际像素数 * （1设备独立像素 / 设备实际像素数）
+
+1 (css)px = 1物理px （device pixel ratio = 1）
+1 (css)px = 2物理px （device pixel ratio = 2）
+1 (css)px = 3物理px （device pixel ratio = 3）
+
+总结：
+
+其实就是在160dpi下1dp等于1物理像素
+320dpi下，1dp等于2物理像素
+
+加大dpi等于web端加大物理分辨率，画面更细腻，需要更多物理像素来显示单个逻辑像素，这样用户在高dpi屏幕看到的画面尺寸不会特别小。
+dp基本等于web里的逻辑像素。
+
+而实际上 (160/screen density) 就是 1/pixelRatio，也就是就是写 H5 页面时，像素比率 window.devicePixelRatio。
+
+也就是说，1dp = 1(css)px。
