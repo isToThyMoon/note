@@ -116,3 +116,14 @@ alwaysBounceVertical: true（default）
 
 bounces: true（default）
 当值为 true 时，如果内容范围比滚动视图本身大，在到达内容末尾的时候，可以弹性地拉动一截。如果为 false，尾部的所有弹性都会被禁用，即使alwaysBounce属性为 true。默认值为 true
+
+
+
+运满满司机端货主端app开发，微前端h5业务开发，快速迭代引流和营销需求，react native重构部分发货页，优化交互体验和性能。
+
+维护开发专线帮uniapp小程序
+
+零担专线运营后台、报价平台后台管理系统等B端SPA系统开发与业务流程重构，redux toolkit重构部分数据流，优化业务逻辑，重构部分图表table组件，提高加载性能。
+
+
+前端为主体的需求，作为业务PM评审和管理任务进程 分割任务，及时跟进进度，代码质量review。
