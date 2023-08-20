@@ -128,9 +128,14 @@ function useMemoizedFn(fn) {
   const fnRef = useRef(fn);
   fnRef.current = useMemo(() => fn, [fn]);
 
-  return useCallback((...args) => {
-    return fnRef.current.apply(args);
-  }, []);
+ const memoizedFn = useRef();
+  if (!memoizedFn.current) {
+    memoizedFn.current = function (this, ...args) {
+      return fnRef.current.apply(this, args);
+    };
+  }
+
+  return memoizedFn.current;
 }
 ```
 
