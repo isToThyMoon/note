@@ -1,0 +1,10 @@
+
+# 类似input这样的筛选项数量巨大时，修改一个input框就导致页面卡顿
+大概率原因是除了筛选项还有结果table，页面dom绑定state太多。
+优化策略除了拆分组件，利用React.Memo或sholdComponentUpdate来控制渲染，
+还有table提供列column配置项中的shouldCellUpdate，决定每一个cell是否重渲染。
+
+
+# table组件问题
+antd的table组件最好用一个自定 义组件封装引入。否则容易在数据更新时导致table的横向滚动条显示两条的bug。但修复思路是在数据重载时直接重刷这个table的dom，react通过key来辅助diff算法重刷页面。key只在react组件上生效。实际操作效果不是很好，但是将table封装成一个自定义组件解决了这个问题。
+其实检查发现这是table在行数过多时纵向超出屏幕，未了左右滚动查看方便，antd创建的一个吸底横向滚动条，在数据行数变小时没有超出屏幕，但是antd没有设置规则在这种场景下自动除掉吸底滚动条，写一个hook测量高度，在没有超出屏幕时获取这个自定义滚动条display none掉也是可行的。

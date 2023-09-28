@@ -1,7 +1,6 @@
 # 
 
-redux是在context基础上实现的
-
+react-redux是在context基础上实现的
 
 使用redux-toolkit
 
@@ -23,7 +22,27 @@ npm install @reduxjs/toolkit react-redux
 新建store文件夹index.ts
 ..
 
+代码：
+```
+import React from 'react';
+import * as actions from '../actions/actions';
+import {useSelector, useDispatch} from 'react-redux';
 
+const App = () => {
+  const dispatch = useDispatch();
+  const count = useSelector(store => store.count);
+
+  return (
+    <div>
+      <h1>The count is {count}</h1>
+      <button onClick={() => dispatch(actions.increment(count))}>+</button>
+      <button onClick={() => dispatch(actions.decrement(count))}>-</button>
+    </div>
+  );
+}
+
+export default App;
+```
 
 
 ## 可以编写可复用的“selector 选择器”函数来封装从 Redux 状态中读取数据的逻辑

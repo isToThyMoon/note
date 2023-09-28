@@ -1,6 +1,15 @@
 # 源码
 
-生命周期为什么取消掉三个旧钩子 fiber架构的可中断使得他们出现问题
+生命周期为什么取消掉三个旧钩子？
+三个钩子在react17删除
+```
+componentWillMount
+componentWillReceiveProps
+componentWillUpdate
+```
+由getDerivedStateFromProps取代
+
+因为fiber架构的可中断使得他们出现问题
 
 什么是fiber架构，react 虚拟dom结构由树结构变成了链表结构 才是可中断的关键
 

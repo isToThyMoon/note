@@ -1,5 +1,6 @@
 
-reflect直接对对象添加属性，静态方法 Reflect.defineProperty() 基本等同于 Object.defineProperty() 方法，唯一不同是返回 Boolean 值。指示reflect值是否被成功定义。
+# reflect直接对对象添加属性
+静态方法 Reflect.defineProperty() 基本等同于 Object.defineProperty() 方法，唯一不同是返回 Boolean 值。指示reflect值是否被成功定义。
 ```js
 Reflect.defineProperty(HTMLElement.prototype, 'ondomresize', {
   set(handler) {
@@ -15,25 +16,36 @@ Reflect.defineProperty(HTMLElement.prototype, 'ondomresize', {
 })
 ```
 
+# proxy
 ```js
 const obj = {
     count: 1
 };
+// var p = new Proxy(target, {
+//   get: function (target, property, receiver) {},
+// });
 const proxy = new Proxy(obj, {
-    get(target, key, receiver) {
+// 以下是传递给 get 方法的参数，this 上下文绑定在handler 对象上
+// target 目标对象 
+// property 被获取的属性名
+// receiver：Proxy 或者继承 Proxy 的对象
+    get(target, property, receiver) {
         console.log("这里是get");
-        return Reflect.get(target, key, receiver);
+        return Reflect.get(target, property, receiver);
     },
-    set(target, key, value, receiver) {
+// value 新属性值
+// receiver 最初被调用的对象。通常是 proxy 本身，但 handler 的 set 方法也有可能在原型链上，或以其他方式被间接地调用（因此不一定是 proxy 本身）
+// 备注： 假设有一段代码执行 obj.name = "jen"， obj 不是一个 proxy，且自身不含 name 属性，但是它的原型链上有一个 proxy，那么，那个 proxy 的 set() 处理器会被调用，而此时，obj 会作为 receiver 参数传进来
+    set(target, property, value, receiver) {
         console.log("这里是set");
-        return Reflect.set(target, key, value, receiver);
+        return Reflect.set(target, property, value, receiver);
     }
 });
     
 console.log(proxy)
 console.log(proxy.count)
 ```
-以上代码就是Proxy的具体使用方式，通过和Reflect 的配合，  就能实现对于对象的拦截
+以上代码就是Proxy的具体使用方式，通过和Reflect 的配合，就能实现对于对象的拦截
 
 如果对象中的元素还是对象，可能就无法拦截了，所以要再包裹一层递归调用：
 ```js
@@ -62,6 +74,30 @@ function reactive(obj) {
 const proxy = reactive(obj);
 ```
 
+
+apply方法：
+ apply方法能拦截函数的调用、call和apply操作。apply(target, thisArg, argumentsList) 三个参数，分别是目标对象、被调用时的上下文对象、被调用的参数数组。如下：
+```
+function add(a, b) {
+  console.log(a + b);
+}
+//给add函数设置一个代理
+let p = new Proxy(add, {
+apply(target, thisArg, argumentsList) {
+  console.log("拦截");
+  //正常应该如下设置：
+  target.apply(this.Arg, argumentsList);
+},
+});
+p(1, 2);
+p.call(null, 13, 22);
+p.apply(null, [5, 3]);
+
+```
+
+
+
+# vue从defineproperty到proxy的原因
 vue2用defineproperty vue3用proxy实现响应式 细粒度组件的状态更新
 实现功能类似，但是本质有区别。
 
