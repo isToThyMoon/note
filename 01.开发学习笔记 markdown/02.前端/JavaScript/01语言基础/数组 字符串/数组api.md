@@ -121,7 +121,7 @@ let results = arr.filter(function(item, index, array) {
 });
 ```
 
-## array.sort((a, b) => (a > b) ? 1 : -1) 
+## array.sort((a, b) => (a < b) ? -1 : 1) 
 数组以字符串的形式进行升序排列。原地排序。
 按照调用该函数的返回值排序。
 如果 compareFunction(a, b) 返回值小于 0 ，那么 a 会被排列到 b 之前；

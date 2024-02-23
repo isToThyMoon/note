@@ -1,4 +1,4 @@
-有了dart-sass曾经安装node-sass的繁琐步骤废弃。
+有了dart-sass曾经安装node-sass的繁琐步骤可以废弃。
 
 
 安装 dart-sass
@@ -19,6 +19,18 @@ npm install node-sass@npm:sass
 
 
 最新版本的cra已经不需要alias重命名了，直接npm i sass -D即可
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

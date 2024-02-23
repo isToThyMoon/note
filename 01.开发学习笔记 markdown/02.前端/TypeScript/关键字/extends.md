@@ -18,6 +18,7 @@ extends约束了泛型T必须符合接口{name:string}（是的 这里其实是�
 # 表示分配
 
 判断一个类型是否可以分配给另一个类型
+```
 type Human = {
     name: string
 }
@@ -27,3 +28,8 @@ type Duck = {
 }
 
 type Bool = Duck extends Human ? 'yes' : 'no'
+```
+
+
+当 T 是联合类型时，条件类型 (T extends U ? X : Y) 会遍历联合类型的每个成员类型，对每个成员类型分别进行计算，然后将这些计算结果组合成最终的联合类型。这是因为 TypeScript 的类型系统会处理每个可能的情况，以确保类型的完备性。
+这是为什么`type Exclude<T, U> = T extends U ? never : T;`的依据。

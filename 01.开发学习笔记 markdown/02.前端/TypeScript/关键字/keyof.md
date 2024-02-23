@@ -50,7 +50,10 @@ type PickUser = Pick<User, 'id'|'age'>
 
 # exclude extract omit
 
-exclude extract
+exclude： 差集 T-U；入参T U，从T从剔除U，余下部分就是结果
+
+extract： 交集，入参T U，T中元素在U中出现过，就是结果
+
 ```ts
 
 type Exclude<T, U> = T extends U ? never : T;
@@ -79,7 +82,7 @@ interface User {
   name: string;
 };
 
-// 相当于: type PickUser = { age: number; name: string; }
+// 相当于: type OmitUser = { age: number; name: string; }
 type OmitUser = Omit<User, "id">
 ```
 
