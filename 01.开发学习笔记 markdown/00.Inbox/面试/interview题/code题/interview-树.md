@@ -15,14 +15,14 @@
 ```js
 // 实现函数接受任意二叉树，求二叉树所有根到叶子路径组成的数字之和
 class TreeNode {
-	constructor(value, left, right) {
-		this.value = value;
-		this.left = left;
-		this.right = right;
-	}
-	// value:number
-	// left?:TreeNode
-	// right?:TreeNode
+  constructor(value, left, right) {
+    this.value = value;
+    this.left = left;
+    this.right = right;
+  }
+  // value:number
+  // left?:TreeNode
+  // right?:TreeNode
 }
 
 const rootNode = new TreeNode(1);
@@ -38,35 +38,35 @@ node2.right = node5;
 node3.left = node6;
 
 function sumNodes(root) {
-	// 深度优先遍历 递归实现
-	function dfs(node, resultList = []) {
-		if (node) {
-			node.value && resultList.push(node.value);
-			node.left && dfs(node.left, resultList); // 递归左树
-			node.right && dfs(node.right, resultList); // 递归右树
-		}
-		return resultList.reduce((acc, cur) => {
-			return acc + cur;
-		}, 0);
-	}
+  // 深度优先遍历 递归实现
+  function dfs(node, resultList = []) {
+    if (node) {
+      node.value && resultList.push(node.value);
+      node.left && dfs(node.left, resultList); // 递归左树
+      node.right && dfs(node.right, resultList); // 递归右树
+    }
+    return resultList.reduce((acc, cur) => {
+      return acc + cur;
+    }, 0);
+  }
 
-	// 广度优先 通过一个队实现
-	function bfs(node) {
-		const queue = [node];
-		const resultList = [];
-		while (queue.length > 0) {
-			const node = queue.shift();
-			node.value && resultList.push(node.value);
-			node.left && queue.push(node.left);
-			node.right && queue.push(node.right);
-		}
-		return resultList.reduce((acc, cur) => {
-			return acc + cur;
-		}, 0);
-	}
+  // 广度优先 通过一个队实现
+  function bfs(node) {
+    const queue = [node];
+    const resultList = [];
+    while (queue.length > 0) {
+      const node = queue.shift();
+      node.value && resultList.push(node.value);
+      node.left && queue.push(node.left);
+      node.right && queue.push(node.right);
+    }
+    return resultList.reduce((acc, cur) => {
+      return acc + cur;
+    }, 0);
+  }
 
-	return dfs(root);
-	// return bfs(root);
+  return dfs(root);
+  // return bfs(root);
 }
 
 // console.log(sumNodes(rootNode));
@@ -86,14 +86,14 @@ function sumNodes(root) {
 ## 反转二叉树
 
 ```js
-function invertTree(rootNode) {
-	if (rootNode === null) {
-		return null; // 处理空节点的情况
-	}
-	const temp = rootNode.left;
-	rootNode.left = invertTree(rootNode.right);
-	rootNode.right = invertTree(temp);
+function invertTree(node) {
+  if (node === null) {
+    return null; // 处理空节点的情况
+  }
+  const temp = node.left;
+  node.left = invertTree(node.right);
+  node.right = invertTree(temp);
 
-	return rootNode;
+  return node;
 }
 ```
